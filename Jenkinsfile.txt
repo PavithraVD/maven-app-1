@@ -1,25 +1,33 @@
-pipeline {
-    agent any
-    tools{
-        maven 'maven s/w'
+node('master') {
+    stage('checkout code') {
+        checkout scm
     }
-    stages {
-        stage('Build') {
-            steps {
-                sh 'mvn clean package'
-            }
-            post {
-                success {
-                    echo 'Archiving the Artifacts'
-                    archiveArtifacts artifacts: '*/target/.war'
-                }
-            }
-        }
-
-        stage('Deploy to tomcat server') {
-            steps {
-                deploy adapters: [tomcat9(credentialsId: 'tomcat', path: '', url: 'http://52.66.42.170:9090/')], contextPath: 'cicd-pipeline', war: '**/*.war'
-            }
-        }
+    
+    stage('Build') {
+        sh 'mvn clean install -Dmaven.test.skip=true'
+    }
+    
+    stage('Test Cases Execution') {
+        sh 'mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Pcoverage-per-test'
+    }
+    
+    stage('Sonar Analysis') {
+        //sh 'mvn sonar:sonar -Dsonar.host.url=http://35.153.67.119:9000 -Dsonar.login=77467cfd2653653ad3b35463fbdb9285f08be5'
+    }
+    
+    stage('Archive Artifacts') {
+        archiveArtifacts artifacts: 'target/*.war'
+    }
+    
+    stage('Deployment') {
+        deploy adapters: [tomcat9(credentialsId: 'TomcatCreds', path: '', url: 'http://52.66.42.170:9090/')], contextPath: 'pipeline/', war: '**/*.war'
+    }
+    
+    stage('Notification') {
+        emailext (
+            subject: 'Job Completed',
+            body: 'Jenkins Pipeline Job for Maven Build got completed !!!',
+            to: 'build-alerts@example.com'
+        )
     }
 }
